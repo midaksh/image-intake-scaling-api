@@ -2,6 +2,5 @@
 __pycache__
 .pytest_cache
 *.pyc
-manual_tests/
 .env
 .DS_Store
