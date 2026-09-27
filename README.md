@@ -15,11 +15,9 @@ Production-ready FastAPI service that accepts `base64-encoded images`, validates
 - [Architecture](#architecture)
 - [Features](#features)
 - [API reference](#api-reference)
-- [Quick start](#quick-start)
-- [Configuration](#configuration)
+- [How to test and run](#how-to-test-and-run)
 - [Deployment](#deployment)
-- [Testing](#testing)
-- [Resources](#resources)
+- [Tech stack](#tech-stack)
 
 ---
 
@@ -85,13 +83,14 @@ Stateless request handling · request-scoped IDs propagated via `X-Request-ID` �
 | 8 | **Dockerized, horizontally scalable** | `Dockerfile` + `docker-compose.yml` with health-checked replicas |
 | 9 | **Automated test suite** | 15 pytest cases covering valid images, corrupt payloads, oversized requests, decompression bombs, and more |
 | 10 | **Concurrency proof script** | `test_concurrent.py` fires N parallel requests and reports status distribution + sampled PIDs |
-| 11 | **Production deploy** | Render (Docker-native web service) |
+| 11 | **Ready-to-use manual test assets** | `manual_tests/` ships with pre-generated sample images and base64 files so testing works immediately after cloning, no setup needed |
+| 12 | **Production deploy** | Render (Docker-native web service) |
 
 ---
 
 ## API reference
 
-**Production base URL:** `https://image-intake-api.onrender.com`
+**Production base URL:** `https://midaksh-image-intake-api.onrender.com`
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -102,15 +101,15 @@ Stateless request handling · request-scoped IDs propagated via `X-Request-ID` �
 
 ```bash
 # Health
-curl https://image-intake-api.onrender.com/health
+curl https://midaksh-image-intake-api.onrender.com/health
 
 # Accept a valid image
-curl -X POST https://image-intake-api.onrender.com/ \
+curl -X POST https://midaksh-image-intake-api.onrender.com/ \
   -H "Content-Type: application/json" \
   -d "{\"image\": \"$(base64 -i photo.png)\"}"
 
 # Rejects invalid/corrupt payloads
-curl -X POST https://image-intake-api.onrender.com/ \
+curl -X POST https://midaksh-image-intake-api.onrender.com/ \
   -H "Content-Type: application/json" \
   -d '{"image": "not-valid-base64"}'
 ```
@@ -135,27 +134,11 @@ curl -X POST https://image-intake-api.onrender.com/ \
 
 ---
 
-## Quick start
-
-**Requirements:**
-Python 3.12+ · Docker (for multi-instance mode)
-
-```bash
-git clone https://github.com/<your-username>/image-intake-api.git
-cd image-intake-api
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app:app --reload --port 8000
-```
-
-Confirm: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health) → `{"status": "ok", "pid": <int>}`
-
----
-
 ## How to test and run
 
-### 1. Run locally (single process)
+**Requirements:** Python 3.12+ · Docker (for multi-instance mode)
+
+### 1. Setup
 
 ```bash
 git clone https://github.com/midaksh/image-intake-api.git
@@ -166,17 +149,50 @@ pip install -r requirements.txt
 uvicorn app:app --reload --port 8000
 ```
 
-```bash
-curl -s http://127.0.0.1:8000/health | python3 -m json.tool
-# {"status": "ok", "pid": <int>}
+Confirm: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health) → `{"status": "ok", "pid": <int>}`
 
-curl -X POST http://127.0.0.1:8000/ \
-  -H "Content-Type: application/json" \
-  -d "{\"image\": \"$(base64 -i photo.png)\"}"
-# {"message": "accepted"}
+### 2. Manual testing (ready-made assets included)
+
+The repo ships with a `manual_tests/` folder containing pre-generated sample images and their base64 encodings, so you can test immediately without creating any files yourself:
+
+```
+manual_tests/
+├── valid.png       valid.png.b64
+├── valid.jpg       valid.jpg.b64
+└── corrupt.png     corrupt.png.b64
 ```
 
-### 2. Run automated tests
+```bash
+cd manual_tests
+
+# Valid image → 200 accepted
+curl -s -X POST http://127.0.0.1:8000/ \
+  -H "Content-Type: application/json" \
+  -d "{\"image\": \"$(cat valid.png.b64)\"}" | python3 -m json.tool
+
+# Corrupt/fake image → 400 invalid_image
+curl -s -w "\nHTTP %{http_code}\n" -X POST http://127.0.0.1:8000/ \
+  -H "Content-Type: application/json" \
+  -d "{\"image\": \"$(cat corrupt.png.b64)\"}"
+```
+
+To regenerate or add your own test assets:
+
+```bash
+python3 << 'EOF'
+from PIL import Image
+Image.new("RGBA", (100, 100), (255, 0, 0, 255)).save("valid.png")
+Image.new("RGB", (100, 100), (0, 255, 0)).save("valid.jpg", format="JPEG")
+with open("corrupt.png", "wb") as f:
+    f.write(b"this is not a real image, just text pretending to be one" * 20)
+EOF
+
+for f in valid.png valid.jpg corrupt.png; do
+  base64 -i "$f" -o "${f}.b64"
+done
+```
+
+### 3. Run automated tests
 
 ```bash
 pytest -v
@@ -184,7 +200,7 @@ pytest -v
 
 15 tests cover valid PNG/JPEG uploads, data-URL payloads, corrupt bytes, invalid base64, missing fields, oversized payloads at every layer, and decompression bombs.
 
-### 3. Run with multiple worker processes (single instance)
+### 4. Run with multiple worker processes (single instance)
 
 ```bash
 WORKERS=4 ./run.sh
@@ -198,7 +214,7 @@ done
 
 Distinct `pid` values across calls confirm requests are being served by different worker processes.
 
-### 4. Run multiple instances behind a load balancer
+### 5. Run multiple instances behind a load balancer
 
 ```bash
 docker compose up --build
@@ -213,7 +229,7 @@ done
 
 A spread of PIDs across the sample confirms Nginx is distributing traffic across all three replicas.
 
-### 5. Prove concurrency under load
+### 6. Prove concurrency under load
 
 ```bash
 python3 test_concurrent.py --url http://localhost:8080/ --n 100
@@ -246,7 +262,7 @@ Build:  Dockerfile (auto-detected)
 Start:  uvicorn app:app --host 0.0.0.0 --port $PORT --workers $WORKERS
 ```
 
-> The live deployment runs as a single Render service. The multi-instance, load-balanced architecture — the actual answer to "how do you run multiple server instances" — is demonstrated locally via `docker compose up --build`, which starts three replicas behind Nginx and is verified with `test_concurrent.py` (see [Testing](#testing)).
+> The live deployment runs as a single Render service. The multi-instance, load-balanced architecture — the actual answer to "how do you run multiple server instances" — is demonstrated locally via `docker compose up --build`, which starts three replicas behind Nginx and is verified with `test_concurrent.py` (see [How to test and run](#how-to-test-and-run)).
 
 ---
 
