@@ -1,0 +1,43 @@
+# Multiple API instances behind nginx.
+# Default: three replicas. Hit http://localhost:8080 (POST / and GET /health).
+x-api: &api
+  build: .
+  expose:
+    - "8000"
+  environment:
+    WORKERS: "2"
+    MAX_IMAGE_BYTES: "8388608"
+  healthcheck:
+    test:
+      [
+        "CMD",
+        "python",
+        "-c",
+        "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
+      ]
+    interval: 5s
+    timeout: 3s
+    retries: 8
+    start_period: 8s
+
+services:
+  api-1:
+    <<: *api
+  api-2:
+    <<: *api
+  api-3:
+    <<: *api
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api-1:
+        condition: service_healthy
+      api-2:
+        condition: service_healthy
+      api-3:
+        condition: service_healthy
