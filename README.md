@@ -4,8 +4,9 @@ Production-ready FastAPI service that accepts `base64-encoded images`, validates
 
 | | |
 |---|---|
-| **Live API** | [https://image-intake-api.onrender.com](https://image-intake-api.onrender.com) |
+| **Live API** | [https://midaksh-image-intake-api.onrender.com/](https://midaksh-image-intake-api.onrender.com/) |
 | **Source** | [github.com/midaksh/image-intake-api](https://github.com/midaksh/image-intake-api) |
+| **Notion Docs** | [Click here >](https://app.notion.com/p/Backend-Dev-3e8804b9116f80ae946bd1e632fa5a3d?source=copy_link) |
 
 ---
 
